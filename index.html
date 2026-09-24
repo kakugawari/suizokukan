@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0c2640">
+<title>すいぞくかん</title>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+<div id="topbar">
+  <div id="title"><img id="titleFish" src="img/f_nanyouhagi.webp" alt="">すいぞくかん</div>
+  <div id="coinbox">
+    <svg viewBox="0 0 28 28"><circle cx="14" cy="14" r="12.5" fill="#ffd24d" stroke="#e0a11b" stroke-width="2"/><circle cx="14" cy="14" r="9" fill="none" stroke="#f5b92e" stroke-width="1.2"/><path d="M7.5 14 L10.5 11.2 L10.5 16.8 Z" fill="#c98415"/><ellipse cx="15.4" cy="14" rx="5" ry="3.4" fill="#c98415"/><circle cx="17.6" cy="13.3" r=".9" fill="#ffd24d"/></svg>
+    <span id="coinval">0</span>
+  </div>
+</div>
+
+<div id="tankwrap"><div id="tank"></div></div>
+
+<div id="nav">
+  <button class="navbtn" id="btnFeed">
+    <svg viewBox="0 0 32 32" fill="none" stroke="#eef8ff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4 C19 10 23 14.5 23 19.5 A9 9 0 0 1 5 19.5 C5 14.5 9 10 14 4 Z"/><path d="M10 20.5 a4 4 0 0 0 4 4"/><path d="M24 8 c2 2.4 3.2 4 3.2 5.6 a3.2 3.2 0 0 1-6.4 0 c0-1.6 1.2-3.2 3.2-5.6z" fill="#eef8ff"/></svg>
+    エサやり
+    <span class="navbadge" id="feedBadge" style="display:none"></span>
+  </button>
+  <button class="navbtn" id="btnShop">
+    <svg viewBox="0 0 32 32" fill="none" stroke="#eef8ff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="22" height="18" rx="4"/><path d="M11 10 V8 a5 5 0 0 1 10 0 v2"/><path d="M10.5 19 l2.2-2 v4z" fill="#eef8ff"/><ellipse cx="17.5" cy="19" rx="4" ry="2.8"/></svg>
+    ショップ
+  </button>
+  <button class="navbtn" id="btnZukan">
+    <svg viewBox="0 0 32 32" fill="none" stroke="#eef8ff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="4" width="16" height="24" rx="3.5"/><path d="M13 24 h6"/></svg>
+    ずかん
+    <span class="navbadge" id="zukanBadge" style="display:none"></span>
+  </button>
+</div>
+
+<div id="toast"></div>
+
+<div class="modal-back" id="shopModal"><div class="modal">
+  <h2>ショップ <button class="xbtn" data-close>✕</button></h2>
+  <p class="hint">置いたおきものはドラッグで動かせるよ</p>
+  <div id="shopList"></div>
+</div></div>
+
+<div class="modal-back" id="zukanModal"><div class="modal">
+  <h2><span>ずかん<small id="zukanCount"></small></span><button class="xbtn" data-close>✕</button></h2>
+  <div id="zukanGrid"></div>
+</div></div>
+
+<div class="modal-back" id="feedModal"><div class="modal">
+  <h2>エサやりタイム <button class="xbtn" data-close>✕</button></h2>
+  <div id="feedIntro">
+    <p style="font-size:13px;line-height:1.7;color:var(--sub);margin-top:0">
+      るすばん中にたまったエサ：<b style="color:var(--gold);font-size:18px" id="feedPendingVal">0</b> 円ぶん<br>
+      魚がまんなかの枠に来たら「キャッチ！」。5回チャレンジで、うまいほどたくさんもらえるよ。
+    </p>
+    <button class="buybtn bigbtn" id="feedStartBtn">スタート</button>
+  </div>
+  <div id="feedGame" style="display:none">
+    <div style="text-align:center;font-size:12px;color:var(--sub);margin-bottom:8px">ラウンド <span id="feedRoundNo">1</span> / 5</div>
+    <div id="feedTrack"><div id="feedZone"></div><img id="feedMarker" src="img/f_kumanomi.webp" alt=""></div>
+    <button class="buybtn bigbtn" id="feedTapBtn">キャッチ！</button>
+    <div id="feedResult" style="text-align:center;margin-top:10px;min-height:22px"></div>
+  </div>
+  <div id="feedDone" style="display:none;text-align:center">
+    <div style="font-size:13px;color:var(--sub)">かくとく！</div>
+    <div style="font-size:30px;font-weight:900;color:var(--gold);margin:6px 0 16px" id="feedEarned">+0</div>
+    <button class="buybtn bigbtn" data-close>とじる</button>
+  </div>
+</div></div>
+
+<script src="./core.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>
