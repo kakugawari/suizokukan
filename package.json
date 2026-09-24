@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node serve.js",
     "test": "node --test *.test.js",
-    "test:ui": "node browser-test.js"
+    "test:ui": "node browser-test.js",
+    "bundle": "node bundle.js"
   },
   "license": "MIT",
   "devDependencies": {

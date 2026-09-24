@@ -148,3 +148,52 @@ img{-webkit-user-drag:none; pointer-events:none;}
   background:rgba(8,30,50,.88); border:1px solid var(--chip-border); color:#fff; padding:9px 16px; border-radius:22px;
   font-size:13px; font-weight:800; white-space:nowrap; opacity:0; transition:opacity .3s, transform .3s; pointer-events:none; z-index:60;}
 #toast.show{opacity:1; transform:translateX(-50%) translateY(6px);}
+
+/* 音のボタン */
+#topright{display:flex; align-items:center; gap:8px;}
+#btnSound{width:40px; height:40px; border-radius:50%; padding:0; display:flex; align-items:center; justify-content:center;
+  background:var(--chip); border:1px solid var(--chip-border); color:var(--ink);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 3px 10px rgba(0,0,0,.25);}
+#btnSound svg{width:22px; height:22px;}
+#btnSound .off{display:none;}
+#btnSound.muted{color:var(--sub);}
+#btnSound.muted .on{display:none;} #btnSound.muted .off{display:inline;}
+
+/* なかよし: ドラッグ中、重ねられる魚のうしろに光の輪。届く所にいる相手はもっと明るく */
+.fish.mate::before{content:""; position:absolute; left:50%; top:50%; width:130%; height:150%; border-radius:50%;
+  transform:translate(-50%,-50%); z-index:-1; pointer-events:none; opacity:0;
+  background:radial-gradient(closest-side, rgba(255,246,170,.95), rgba(255,220,90,.55) 45%, rgba(255,220,90,0) 100%);}
+.fish.mate::before{animation:mate 1s ease-in-out infinite;}
+.fish.mate.target::before{animation:none; opacity:1; width:170%; height:190%;}
+@keyframes mate{0%,100%{opacity:.6;}50%{opacity:1;}}
+/* 頭の上の ♥。位置は left/top で決め、動きは translate だけにする */
+.fish.mate::after{content:"♥"; position:absolute; left:50%; top:-20px; width:22px; margin-left:-11px; text-align:center;
+  font-size:18px; line-height:22px; color:#ff6f91; pointer-events:none; opacity:0;
+  text-shadow:0 0 3px #fff, 0 0 3px #fff, 0 1px 3px rgba(120,0,40,.5);}
+.fish.mate::after{opacity:1; animation:heart 1s ease-in-out infinite;} /* ↑とあわせて、光るのは .mate の魚だけ (ほかの魚には箱も作らない) */
+.fish.mate.target::after{font-size:24px; animation:none;}
+@keyframes heart{0%,100%{translate:0 0;}50%{translate:0 -4px;}}
+
+/* 新発見 */
+#discover{position:fixed; inset:0; z-index:70; display:none; align-items:center; justify-content:center;
+  background:rgba(3,15,28,.62);}
+#discover.open{display:flex;}
+.dc-card{position:relative; width:330px; padding:22px 20px 16px; border-radius:28px; text-align:center; overflow:hidden;
+  background:linear-gradient(#1c5486,#0f2f50); border:2px solid rgba(255,225,120,.75);
+  box-shadow:0 0 0 4px rgba(255,210,77,.18), 0 16px 40px rgba(0,0,0,.45);}
+.dc-rays{position:absolute; left:50%; top:118px; width:520px; height:520px; margin:-260px 0 0 -260px; pointer-events:none;
+  background:repeating-conic-gradient(rgba(255,240,170,.16) 0 10deg, rgba(255,240,170,0) 10deg 20deg);
+  -webkit-mask:radial-gradient(closest-side, #000 20%, transparent 70%); mask:radial-gradient(closest-side, #000 20%, transparent 70%);
+  animation:rays 14s linear infinite;}
+@keyframes rays{to{transform:rotate(360deg);}}
+.dc-head{position:relative; font-size:22px; font-weight:900; color:var(--gold); letter-spacing:2px;
+  text-shadow:0 2px 0 #7a4a00;}
+.dc-stage{position:relative; height:150px; display:flex; align-items:center; justify-content:center; margin:6px 0 4px;}
+.dc-stage img{max-width:210px; max-height:140px; filter:var(--ff) drop-shadow(0 8px 10px rgba(0,20,40,.45));}
+.dc-card.kira .dc-stage img{filter:var(--ff) drop-shadow(0 0 12px rgba(255,240,150,1)) drop-shadow(0 8px 10px rgba(0,20,40,.4));}
+.dc-name{position:relative; font-size:22px; font-weight:900;}
+.dc-sub{position:relative; font-size:13px; color:var(--sub); font-weight:800; margin-top:4px;}
+.dc-fact{position:relative; font-size:12px; line-height:1.6; text-align:left; margin-top:12px; padding:9px 11px; border-radius:12px;
+  background:rgba(0,0,0,.2);}
+.dc-fact::before{content:"まめちしき　"; color:var(--gold); font-weight:900;}
+.dc-tap{position:relative; font-size:11px; color:var(--sub); margin-top:12px;}

@@ -28,6 +28,7 @@
 npm start          # http://localhost:8080/ で開く
 npm test           # ロジックのテスト (node だけで動く。速い)
 npm run test:ui    # ブラウザで実際に動かすテスト (要 npm i -D playwright)
+npm run bundle     # 1 枚の HTML (dist/suizokukan.html) にまとめる。テストプレイ用
 ```
 
 `npm run test:ui` は本物のブラウザを立ち上げ、指の操作をそのまま再現する。
@@ -39,6 +40,8 @@ npm run test:ui    # ブラウザで実際に動かすテスト (要 npm i -D pl
 index.html / styles.css   画面
 core.js                   ロジック。DOM を触らない。ブラウザと node の両方で動く
 app.js                    操作・描画
+sound.js                  効果音 (Web Audio でその場で作る) と振動
+bundle.js                 テストプレイ用に 1 枚の HTML にまとめる (npm run bundle → dist/)
 img/                      絵 (WebP)。いきもの f_*・おきもの d_*・水槽の背景 tank
 core.test.js              ロジックのテスト (node --test)
 browser-test.js           ブラウザで動かすテスト
@@ -61,6 +64,11 @@ serve.js                  開発用サーバー
   そのための見張りも要らない。寸法は実機の 430pt で決め打ってよい
 - 入っている playwright が `iPhone 16 Plus` を知らないときは、
   同じ 430 幅の `iPhone 15 Plus` で代えてテストする
+- 操作は **タップ** と **ドラッグして重ねる** だけ。これ以上ふやさない
+- 振動: iPhone の Safari には `navigator.vibrate` が無い。iOS 18 からの
+  `<input type="checkbox" switch>` を切りかえるとコツッと震える仕組みを使う
+  (指でさわった流れの中でだけ効く。3 秒ごとの自然発生では震えない)。
+  音は本体のマナースイッチが入っていると鳴らない (それでよい)
 
 ## まだ直していないこと (プロトタイプから持ちこんだまま)
 

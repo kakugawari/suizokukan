@@ -105,12 +105,13 @@
     });
     el.addEventListener('pointermove', (e) => {
       if (!f.drag) return;
-      if (Math.hypot(e.clientX - sx, e.clientY - sy) > 6) moved = true;
+      if (!moved && Math.hypot(e.clientX - sx, e.clientY - sy) > 6) { moved = true; showMates(f); }
       const r = tank.getBoundingClientRect(); f.x = e.clientX - r.left - ox; f.y = e.clientY - r.top - oy; placeFish(f);
+      if (moved) showTarget(f);
     });
     const up = () => {
-      if (!f.drag) return; f.drag = false; el.classList.remove('dragging');
-      if (!moved) { state.coins += 1; setCoins(); floatText(f.x, f.y - 20, '+1'); save(); return; }
+      if (!f.drag) return; f.drag = false; el.classList.remove('dragging'); clearMates();
+      if (!moved) { state.coins += 1; setCoins(); floatText(f.x, f.y - 20, '+1'); Sound.play('coin'); save(); return; }
       tryMerge(f);
     };
     el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
@@ -133,25 +134,80 @@
 
   /* ===== 合体・こうはい ===== */
   function removeFish(f) { state.fish = state.fish.filter((o) => o !== f); f.el.remove(); }
+  const reach = (f) => Math.max(40, fishSize(f).w * 0.6);
+  /** ドラッグしはじめたら、重ねられる魚を光らせる */
+  function showMates(f) {
+    for (const o of state.fish) if (o !== f) o.el.classList.toggle('mate', C.canMerge(f, o));
+  }
+  /** 今はなしたら重なる相手を、いちばん明るくする。指が動くたびに呼ばれるので、変わった魚だけさわる */
+  let lit = null;
+  function showTarget(f) {
+    let p = C.pickPartner(f, state.fish, reach(f));
+    if (p && !C.canMerge(f, p)) p = null;
+    if (p === lit) return;
+    if (lit && lit.el) lit.el.classList.remove('target');
+    if (p) p.el.classList.add('target');
+    lit = p;
+  }
+  function clearMates() {
+    for (const o of state.fish) o.el.classList.remove('mate', 'target');
+    lit = null;
+  }
   function tryMerge(f) {
-    const p = state.fish.find((o) => o !== f && Math.hypot(o.x - f.x, o.y - f.y) < Math.max(40, fishSize(f).w * 0.6));
+    const p = C.pickPartner(f, state.fish, reach(f));
     if (!p) { save(); return; }
     const out = C.mergeOutcome(f, p, state.found);
-    if (out.kind === 'none') { toast('この2ひきは なかよしじゃないみたい…'); save(); return; }
+    if (out.kind === 'none') { toast('この2ひきは なかよしじゃないみたい…'); Sound.play('nope'); save(); return; }
     const x = (f.x + p.x) / 2, y = (f.y + p.y) / 2;
     removeFish(f); removeFish(p);
     const { f: n } = addFish(out.sp, out.v, x, y); popFx(n);
     state.coins += out.reward; setCoins(); floatText(x, y - 30, '+' + out.reward);
-    const head = out.isNew ? '✨ 新発見！ ' : '';
-    if (out.kind === 'same') {
+    if (out.isNew) {
+      Sound.play('merge'); Sound.buzz(1);
+      discover(out.sp, out.v);
+    } else if (out.kind === 'same') {
       const v = out.v;
-      toast(head + C.fishName(out.sp, v) + (v === 4 ? ' がうまれた！ きらきら！' : v ? ' がうまれた！' : ' がうまれた'));
+      Sound.play(v === 4 ? 'gold' : v === 3 ? 'rare' : 'merge'); Sound.buzz(v >= 3 ? 2 : 1);
+      toast(C.fishName(out.sp, v) + (v === 4 ? ' がうまれた！ きらきら！' : v ? ' がうまれた！' : ' がうまれた'));
     } else {
-      toast(head + SP[out.sp].name + 'がうまれた！');
+      Sound.play('merge'); Sound.buzz(1);
+      toast(SP[out.sp].name + 'がうまれた！');
     }
     save();
   }
   function popFx(f) { f.el.classList.add('pop'); sparkle(f.x, f.y); }
+
+  /* ===== 新発見 ===== */
+  // 画面のまんなかに大きく出す。窓 (ショップなど) が開いているあいだは待たせて、とじたら出す
+  const dc = document.getElementById('discover');
+  const discoverQ = [];
+  let dcOpenedAt = 0;
+  function discover(sp, v) { discoverQ.push({ sp, v }); showDiscover(); }
+  function showDiscover() {
+    if (dc.classList.contains('open') || !discoverQ.length) return;
+    if (Object.values(modals).some((m) => m.classList.contains('open'))) return;
+    const { sp, v } = discoverQ.shift();
+    const img = document.getElementById('dcImg');
+    img.src = src('f_' + sp); img.style.setProperty('--ff', C.formFilter(sp, v));
+    document.getElementById('dcName').textContent = C.fishName(sp, v);
+    document.getElementById('dcHead').textContent = v === 4 ? 'きらきら しんはっけん！' : 'しんはっけん！';
+    document.getElementById('dcSub').textContent = 'ずかんに のったよ (' + C.foundCount(state.found) + ' / ' + SPECIES.length * FORM_N + ')';
+    document.getElementById('dcFact').textContent = SP[sp].fact;
+    dc.querySelector('.dc-card').classList.toggle('kira', v === 4);
+    dc.classList.add('open'); dcOpenedAt = performance.now();
+    Sound.play(v === 4 ? 'gold' : 'found'); Sound.buzz(2);
+    // 出てくるときの動き (Web Animations。CSS の transform と取り合わない)
+    dc.querySelector('.dc-card').animate(
+      [{ transform: 'scale(.6)', opacity: 0 }, { transform: 'scale(1.06)', opacity: 1, offset: 0.7 }, { transform: 'scale(1)' }],
+      { duration: 380, easing: 'ease-out' });
+    img.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(-8px)' }, { transform: 'translateY(0)' }],
+      { duration: 1800, iterations: Infinity, easing: 'ease-in-out' });
+  }
+  dc.addEventListener('click', () => {
+    if (performance.now() - dcOpenedAt < 350) return;   // 出た直後の指で、すぐ閉じないように
+    dc.classList.remove('open'); updateZukanBadge();
+    showDiscover();
+  });
 
   /* ===== 演出 ===== */
   function sparkle(x, y) {
@@ -191,7 +247,9 @@
       const d = state.decor[Math.floor(Math.random() * state.decor.length)], list = DC[d.type].spawn;
       const sp = list[Math.floor(Math.random() * list.length)];
       const { f, isNew } = addFish(sp, 0, d.fx * W(), Math.min(H() * 0.72, d.fy * H() - decorH(d) * 0.5)); popFx(f);
-      toast((isNew ? '✨ 新発見！ ' : '') + DC[d.type].name + 'から' + SP[sp].name + 'が出てきた！');
+      Sound.play('bubble');
+      toast(DC[d.type].name + 'から' + SP[sp].name + 'が出てきた！');
+      if (isNew) discover(sp, 0);
     }
     save();
   }
@@ -202,7 +260,7 @@
     zukan: document.getElementById('zukanModal'),
     feed: document.getElementById('feedModal')
   };
-  function closeModals() { Object.values(modals).forEach((m) => m.classList.remove('open')); stopFeed(); }
+  function closeModals() { Object.values(modals).forEach((m) => m.classList.remove('open')); stopFeed(); showDiscover(); }
   document.querySelectorAll('[data-close]').forEach((b) => { b.onclick = closeModals; });
   Object.values(modals).forEach((m) => m.addEventListener('click', (e) => { if (e.target === m) closeModals(); }));
   document.getElementById('btnShop').onclick = () => { renderShop(); modals.shop.classList.add('open'); };
@@ -222,7 +280,7 @@
     const d = DC[id], c = C.decorCost(d, state.decor); if (state.coins < c) return;
     state.coins -= c; setCoins();
     const o = { id: uid++, type: id, fx: 0.15 + Math.random() * 0.7, fy: 0.86 + Math.random() * 0.1 };
-    state.decor.push(o); makeDecorEl(o); sparkle(o.fx * W(), o.fy * H() - 40);
+    state.decor.push(o); makeDecorEl(o); sparkle(o.fx * W(), o.fy * H() - 40); Sound.play('buy'); Sound.buzz(1);
     save(); closeModals(); toast(d.name + 'を置いたよ！ ドラッグで動かせるよ');
   }
 
@@ -265,7 +323,8 @@
     document.querySelectorAll('[data-claim]').forEach((b) => {
       b.onclick = () => {
         const k = b.dataset.claim, amt = +b.dataset.amt; if (state.claimed[k]) return;
-        state.claimed[k] = true; state.coins += amt; setCoins(); save(); toast('🎁 ごほうび +' + amt + '円！'); renderZukan();
+        state.claimed[k] = true; state.coins += amt; setCoins(); save(); toast('🎁 ごほうび +' + amt + '円！');
+        Sound.play('rare'); Sound.buzz(2); renderZukan();
       };
     });
     updateZukanBadge();
@@ -302,18 +361,36 @@
     if (!fs || fs.lock) return; fs.lock = true; cancelAnimationFrame(fs.raf);
     const r = C.feedGrade(fs.pos);
     fs.res.push(r.wgt); document.getElementById('feedResult').innerHTML = `<span class="grade ${r.g}">${r.label}</span>`;
+    Sound.play(r.g); if (r.g === 'perfect') Sound.buzz(1);
     setTimeout(() => { if (!fs) return; fs.round++; fs.round >= C.FEED_ROUNDS ? finishFeed() : round(); }, 600);
   };
   function finishFeed() {
     const earned = C.feedEarned(fs.pool, fs.res);
     state.coins += earned; state.pending = Math.max(0, state.pending - fs.pool); setCoins(); updateBadge(); save();
     document.getElementById('feedEarned').textContent = '+' + earned + '円'; show('feedDone'); fs = null;
+    setTimeout(() => Sound.play('coin'), 200);
   }
   function stopFeed() { if (fs) { cancelAnimationFrame(fs.raf); fs = null; } }
+
+  /* ===== 音 ===== */
+  const btnSound = document.getElementById('btnSound');
+  function applySound() {
+    Sound.setEnabled(state.sound);
+    btnSound.classList.toggle('muted', !state.sound);
+    btnSound.setAttribute('aria-label', state.sound ? 'おと: オン' : 'おと: オフ');
+  }
+  btnSound.onclick = () => {
+    state.sound = !state.sound; applySound(); save();
+    Sound.play('tap'); Sound.buzz(1);
+    toast(state.sound ? '🔊 おと と ぶるぶる オン' : '🔇 おと と ぶるぶる オフ');
+  };
+  // iPhone は、指でさわった流れの中でないと音を出せない。さわるたびに起こしておく
+  document.addEventListener('pointerdown', () => Sound.unlock(), true);
 
   /* ===== スタート ===== */
   function init() {
     load();
+    applySound();
     const away = C.awaySeconds(Date.now(), state.lastTs);
     if (away > 10) { state.pending += C.rate(state.decor.length) * away; setTimeout(() => toast('🐟 るすばん中にエサがたまったよ！'), 600); }
     bubbles();
@@ -342,7 +419,9 @@
     ready: () => ready,
     state: () => state,
     tick: tick,
-    addFish: addFish
+    addFish: addFish,
+    sounds: () => Sound.log,
+    discover: discover
   };
 
   init();

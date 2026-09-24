@@ -110,3 +110,22 @@ test('エサやり: まんなかほど良い判定', () => {
   const m = C.feedMarker(0, 0);
   assert.strictEqual(m.pos, 50);
 });
+
+test('canMerge: 同じ魚どうし・なかよしだけ', () => {
+  assert.ok(C.canMerge({ sp: 'ebi' }, { sp: 'ebi' }));
+  assert.ok(C.canMerge({ sp: 'ebi' }, { sp: 'kingyo' }));
+  assert.ok(C.canMerge({ sp: 'kingyo' }, { sp: 'ebi' }));
+  assert.ok(!C.canMerge({ sp: 'ebi' }, { sp: 'kame' }));
+});
+
+test('pickPartner: 届く範囲で、なかよしを先に、近い順に選ぶ', () => {
+  const f = { sp: 'ebi', x: 0, y: 0 };
+  const near = { sp: 'kame', x: 5, y: 0 };      // いちばん近いが なかよしでない
+  const mate = { sp: 'kingyo', x: 30, y: 0 };   // なかよし
+  const mate2 = { sp: 'ebi', x: 20, y: 0 };     // 同じ魚 (もっと近い)
+  const far = { sp: 'ebi', x: 100, y: 0 };      // 届かない
+  assert.strictEqual(C.pickPartner(f, [f, near, mate, far], 50), mate);
+  assert.strictEqual(C.pickPartner(f, [f, near, mate, mate2], 50), mate2);
+  assert.strictEqual(C.pickPartner(f, [f, near, far], 50), near);   // なかよしが届かなければ近い魚
+  assert.strictEqual(C.pickPartner(f, [f, far], 50), null);
+});

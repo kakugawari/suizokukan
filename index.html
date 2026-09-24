@@ -12,9 +12,12 @@
 
 <div id="topbar">
   <div id="title"><img id="titleFish" src="img/f_nanyouhagi.webp" alt="">すいぞくかん</div>
+  <div id="topright">
+  <button id="btnSound" aria-label="おと"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path class="on" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
   <div id="coinbox">
     <svg viewBox="0 0 28 28"><circle cx="14" cy="14" r="12.5" fill="#ffd24d" stroke="#e0a11b" stroke-width="2"/><circle cx="14" cy="14" r="9" fill="none" stroke="#f5b92e" stroke-width="1.2"/><path d="M7.5 14 L10.5 11.2 L10.5 16.8 Z" fill="#c98415"/><ellipse cx="15.4" cy="14" rx="5" ry="3.4" fill="#c98415"/><circle cx="17.6" cy="13.3" r=".9" fill="#ffd24d"/></svg>
     <span id="coinval">0</span>
+  </div>
   </div>
 </div>
 
@@ -38,6 +41,19 @@
 </div>
 
 <div id="toast"></div>
+
+<!-- 新発見: 画面のまんなかで大きく見せる。タップでとじる -->
+<div id="discover" aria-live="polite">
+  <div class="dc-card">
+    <div class="dc-rays"></div>
+    <div class="dc-head" id="dcHead">しんはっけん！</div>
+    <div class="dc-stage"><img id="dcImg" alt=""></div>
+    <div class="dc-name" id="dcName"></div>
+    <div class="dc-sub" id="dcSub">ずかんに のったよ</div>
+    <div class="dc-fact" id="dcFact"></div>
+    <div class="dc-tap">タップでとじる</div>
+  </div>
+</div>
 
 <div class="modal-back" id="shopModal"><div class="modal">
   <h2>ショップ <button class="xbtn" data-close>✕</button></h2>
@@ -73,6 +89,7 @@
 </div></div>
 
 <script src="./core.js"></script>
+<script src="./sound.js"></script>
 <script src="./app.js"></script>
 </body>
 </html>

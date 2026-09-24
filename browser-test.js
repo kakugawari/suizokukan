@@ -120,58 +120,116 @@ async function run() {
     ok(fit.title === 'すいぞくかん', `見出しが出ている (${fit.title})`);
     ok(fit.fish === 3, `はじめは魚が 3 びき (${fit.fish})`);
 
-    const broken = await phone.evaluate(() => [...document.images].filter((i) => !i.complete || !i.naturalWidth).map((i) => i.src));
+    const broken = await phone.evaluate(() => [...document.images]
+      .filter((i) => i.getAttribute('src') && (!i.complete || !i.naturalWidth)).map((i) => i.src));
     ok(broken.length === 0, '絵が全部読みこめている' + (broken.length ? ': ' + broken.join(', ') : ''));
 
     // ------------------------------------------------ アプリの操作
     section('魚をさわる');
+    const app = (fn, arg) => phone.evaluate(fn, arg);
+    const sounds = () => app(() => window.__app.sounds().slice());
     // 魚の見えている中心 (泳いでいるので、そのつど測る)
-    const center = (id) => phone.evaluate((fid) => {
+    const center = (id) => app((fid) => {
       const f = window.__app.state().fish.find((o) => o.id === fid);
       const r = f.el.getBoundingClientRect();
       return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
     }, id);
-    const ids = await phone.evaluate(() => window.__app.state().fish.map((f) => [f.id, f.sp]));
-    const coins0 = await phone.evaluate(() => window.__app.state().coins);
+    const glow = () => app(() => window.__app.state().fish.map((f) => ({ id: f.id, sp: f.sp,
+      mate: f.el.classList.contains('mate'), target: f.el.classList.contains('target') })));
+    const ids = await app(() => window.__app.state().fish.map((f) => [f.id, f.sp]));
+    const coins0 = await app(() => window.__app.state().coins);
     let c = await center(ids[0][0]);
     await phone.mouse.move(c.x, c.y); await phone.mouse.down(); await phone.mouse.up();
-    ok(await phone.evaluate(() => window.__app.state().coins) === coins0 + 1, 'タップするとコインが 1 ふえる');
+    ok(await app(() => window.__app.state().coins) === coins0 + 1, 'タップするとコインが 1 ふえる');
+    ok((await sounds()).includes('s:coin'), 'タップすると コインの音を鳴らす');
 
-    // ドラッグして重ねる。相手も泳いでいるので、少しずつ動かして最後に相手の真上で離す
-    async function dragOnto(fromId, toId) {
+    // ドラッグして重ねる。相手も泳いでいるので、少しずつ動かして最後に相手の真上で離す。
+    // mid: 途中で / last: はなす直前に 様子を見る
+    async function dragOnto(fromId, toId, mid, last) {
       const a = await center(fromId);
       await phone.mouse.move(a.x, a.y); await phone.mouse.down();
       for (let i = 1; i <= 6; i++) {
         const b = await center(toId);
         await phone.mouse.move(a.x + (b.x - a.x) * i / 6, a.y + (b.y - a.y) * i / 6);
+        if (i === 2 && mid) await mid();
       }
       const b = await center(toId);
       await phone.mouse.move(b.x, b.y);
+      if (last) await last();
       await phone.mouse.up();
     }
     const kuma = ids.filter(([, sp]) => sp === 'kumanomi').map(([id]) => id);
     const hagi = ids.find(([, sp]) => sp === 'nanyouhagi')[0];
-    await dragOnto(kuma[0], hagi);
-    const bred = await phone.evaluate(() => window.__app.state().fish.map((f) => f.sp));
-    ok(bred.length === 2 && bred.includes('kiirohagi'), `クマノミとナンヨウハギを重ねるとキイロハギが生まれる (${bred.join(',')})`);
+    // なかよしでない魚も 1 ぴき、はなれた所に置いておく
+    const kame = await app(() => window.__app.addFish('kame', 0, 60, 120).f.id);
+    let midGlow, lastGlow;
+    await dragOnto(kuma[0], hagi, async () => { midGlow = await glow(); }, async () => { lastGlow = await glow(); });
+    const g = (list, id) => list.find((x) => x.id === id);
+    ok(g(midGlow, kuma[1]).mate && g(midGlow, hagi).mate, 'ドラッグ中、重ねられる魚 (同じ魚・なかよし) が光る');
+    ok(!g(midGlow, kame).mate, 'ドラッグ中、なかよしでない魚は光らない');
+    ok(!g(midGlow, kuma[0]).mate, 'ドラッグしている魚じしんは光らない');
+    ok(g(lastGlow, hagi).target && lastGlow.filter((x) => x.target).length === 1, '相手の真上では、その 1 ぴきだけ いちばん明るくなる');
+    const afterGlow = await glow();
+    ok(afterGlow.every((x) => !x.mate && !x.target), 'はなしたら光は消える');
+    const bred = await app(() => window.__app.state().fish.map((f) => f.sp));
+    ok(bred.length === 3 && bred.includes('kiirohagi'), `クマノミとナンヨウハギを重ねるとキイロハギが生まれる (${bred.join(',')})`);
+
+    section('新発見');
+    const dc = await app(() => ({ open: document.getElementById('discover').classList.contains('open'),
+      name: document.getElementById('dcName').textContent, sub: document.getElementById('dcSub').textContent,
+      img: document.getElementById('dcImg').naturalWidth }));
+    ok(dc.open && dc.name === 'キイロハギ', `はじめての魚が生まれると、まんなかに大きく出る (${dc.name})`);
+    ok(dc.img > 0 && /ずかんに のったよ \(\d+ \/ 50\)/.test(dc.sub), `絵と、ずかんの数が出る (${dc.sub})`);
+    const s1 = await sounds();
+    ok(s1.includes('s:found') && s1.includes('b:2'), '新発見の音と、2 回の振動');
+    const box = await phone.locator('#discover .dc-card').boundingBox();
+    ok(box && box.y >= 0 && box.y + box.height <= PHONE.viewport.height, `新発見の札が画面に収まる (下端 ${box && Math.round(box.y + box.height)} / ${PHONE.viewport.height})`);
+    await phone.waitForTimeout(400);
+    await phone.mouse.click(215, 60);
+    ok(!(await app(() => document.getElementById('discover').classList.contains('open'))), 'タップでとじる');
 
     // なかよしでない 2 ひき (クマノミとキイロハギ)
-    await phone.evaluate(() => { window.__app.state().fish.forEach((f) => { f.vx = 0; f.vy = 0; }); });
-    const before = await phone.evaluate(() => window.__app.state().coins);
-    const ki = (await phone.evaluate(() => window.__app.state().fish.find((f) => f.sp === 'kiirohagi').id));
-    await dragOnto(kuma[1], ki);
-    const none = await phone.evaluate(() => window.__app.state().fish.length);
-    ok(none === 2, `なかよしでない 2 ひきは合体しない (${none} ひき)`);
-    ok(await phone.evaluate(() => window.__app.state().coins) === before, 'なかよしでないときはコインが増えない');
+    await app(() => { window.__app.state().fish.forEach((f) => { f.vx = 0; f.vy = 0; }); });
+    const before = await app(() => window.__app.state().coins);
+    const ki = await app(() => window.__app.state().fish.find((f) => f.sp === 'kiirohagi').id);
+    let kiGlow;
+    await dragOnto(kuma[1], ki, null, async () => { kiGlow = await glow(); });
+    ok(!g(kiGlow, ki).mate && !g(kiGlow, ki).target, 'なかよしでない相手の上では光らない');
+    const none = await app(() => window.__app.state().fish.length);
+    ok(none === 3, `なかよしでない 2 ひきは合体しない (${none} ひき)`);
+    ok(await app(() => window.__app.state().coins) === before, 'なかよしでないときはコインが増えない');
+    ok((await sounds()).slice(-1)[0] === 's:nope', 'なかよしでないときは 低い音');
 
     // 同じ魚どうし → 1 ぴきになり、コインがもらえる
-    const twin = await phone.evaluate(() => window.__app.addFish('ebi', 0, 120, 200).f.id);
-    const ebi = await phone.evaluate(() => window.__app.addFish('ebi', 0, 300, 200).f.id);
-    const beforeSame = await phone.evaluate(() => window.__app.state().coins);
+    const twin = await app(() => window.__app.addFish('ebi', 0, 120, 200).f.id);
+    const ebi = await app(() => window.__app.addFish('ebi', 0, 300, 200).f.id);
+    const beforeSame = await app(() => window.__app.state().coins);
     await dragOnto(twin, ebi);
-    const same = await phone.evaluate(() => ({ ebi: window.__app.state().fish.filter((f) => f.sp === 'ebi').length,
+    const same = await app(() => ({ ebi: window.__app.state().fish.filter((f) => f.sp === 'ebi').length,
       coins: window.__app.state().coins }));
     ok(same.ebi === 1 && same.coins >= beforeSame + 5, `エビどうしを重ねると 1 ぴきになり、コインが増える (+${same.coins - beforeSame})`);
+    // 色ちがいが はじめて出たら新発見が出ているので、とじておく
+    await phone.waitForTimeout(400);
+    if (await app(() => document.getElementById('discover').classList.contains('open'))) await phone.mouse.click(215, 60);
+
+    section('新発見は、窓が開いているあいだ待つ');
+    await phone.locator('#btnZukan').click();
+    await app(() => window.__app.discover('kame', 4));
+    ok(!(await app(() => document.getElementById('discover').classList.contains('open'))), 'ずかんを開いているあいだは出ない');
+    await phone.locator('#zukanModal [data-close]').click();
+    const waited = await app(() => ({ open: document.getElementById('discover').classList.contains('open'),
+      name: document.getElementById('dcName').textContent, head: document.getElementById('dcHead').textContent }));
+    ok(waited.open && waited.name === 'きんウミガメ', `とじたら出る (${waited.name})`);
+    ok(waited.head === 'きらきら しんはっけん！', 'きん のときは見出しが変わる');
+    await phone.waitForTimeout(400);
+    await phone.mouse.click(215, 60);
+
+    section('おと');
+    await phone.locator('#btnSound').click();
+    const muted = await app(() => ({ sound: window.__app.state().sound, cls: document.getElementById('btnSound').classList.contains('muted') }));
+    ok(muted.sound === false && muted.cls, 'ボタンで おと・ぶるぶる を切れる');
+    await phone.locator('#btnSound').click();
+    ok(await app(() => window.__app.state().sound) === true, 'もう一度おすと もどる');
 
     section('ショップ');
     await phone.evaluate(() => { window.__app.state().coins = 100; });
@@ -205,9 +263,9 @@ async function run() {
     await phone.locator('#btnZukan').click();
     ok(await phone.locator('.zk-card').count() === 10, 'ずかんに 10 種ならぶ');
     const zk = await phone.evaluate(() => document.querySelector('.zk-top').textContent);
-    // クマノミ・ナンヨウハギ・キイロハギ・エビ + エビどうしで生まれた色 (ふつうなら増えない)
+    // クマノミ・ナンヨウハギ・キイロハギ・ウミガメ・エビ + エビどうしで生まれた色 (ふつうなら増えない)
     const got = Number((zk.match(/(\d+) \/ 50/) || [])[1]);
-    ok(got === 4 || got === 5, `みつけたすがたの数が出る (${got} / 50)`);
+    ok(got === 5 || got === 6, `みつけたすがたの数が出る (${got} / 50)`);
     await phone.locator('#zukanModal [data-close]').click();
 
     section('保存');

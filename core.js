@@ -81,6 +81,25 @@
     'fugu+kiirohagi': 'kame'
   };
   const breedOf = (a, b) => BREED[[a, b].sort().join('+')];
+  /** 重ねたら何か生まれる組か (同じ魚どうし、または なかよし) */
+  const canMerge = (a, b) => a.sp === b.sp || !!breedOf(a.sp, b.sp);
+
+  /**
+   * 指をはなした所で、どの魚と重ねたことにするか。
+   * 届く範囲 (reach) の中で、合わせられる魚を先に、近い順に選ぶ。
+   * 合わせられる魚が範囲に無ければ、いちばん近い魚 (なかよしでない) を返す。
+   */
+  function pickPartner(f, others, reach) {
+    let best = null, bestD = Infinity, mate = false;
+    for (const o of others) {
+      if (o === f) continue;
+      const d = Math.hypot(o.x - f.x, o.y - f.y);
+      if (d >= reach) continue;
+      const m = canMerge(f, o);
+      if ((m && !mate) || (m === mate && d < bestD)) { best = o; bestD = d; mate = m; }
+    }
+    return best;
+  }
 
   /**
    * 2 ひきを重ねたときに何が起きるか。
@@ -126,7 +145,7 @@
   /* ===== 保存データ ===== */
   const SAVE_KEY = 'suizokukan_v2';
   function newState(now) {
-    return { coins: 30, pending: 0, lastTs: now, fish: [], decor: [], found: {}, claimed: {}, ver: 3 };
+    return { coins: 30, pending: 0, lastTs: now, fish: [], decor: [], found: {}, claimed: {}, sound: true, ver: 3 };
   }
   /** 読みこんだデータを今の形にそろえる (その場で書きかえる) */
   function migrate(state) {
@@ -139,6 +158,7 @@
       state.ver = 3;
     }
     state.claimed = state.claimed || {};
+    if (state.sound == null) state.sound = true;
     state.fish = state.fish.filter((f) => SP[f.sp]);
     state.fish.forEach((f) => { if (f.v == null) f.v = 0; });
     state.decor = state.decor.filter((d) => DC[d.type]);
@@ -197,7 +217,7 @@
   return {
     IMG_SIZE, imgSrc,
     SPECIES, SP, FORM_RATE, FORM_N, formFilter, formLabel, fishName, rollForm,
-    BREED, breedOf, mergeOutcome,
+    BREED, breedOf, canMerge, pickPartner, mergeOutcome,
     DECOR, DC, decorCost, TANK_CAP,
     rate, AWAY_MAX, awaySeconds,
     SAVE_KEY, newState, migrate, nextUid,
