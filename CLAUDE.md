@@ -18,6 +18,15 @@
 もとは Artifact で作ったプロトタイプ (1 枚の HTML) を、この形に分けたもの。
 保存は `localStorage` の `suizokukan_v2`。
 
+## 公開
+
+- **本番: https://kakugawari.github.io/suizokukan/** (GitHub Pages。`main` の直下をそのまま配る)
+- **`main` に push すると、そのまま本番が変わる。** 作業は作業ブランチで進め、`main` へは言われてから出す
+- テストプレイは Artifact の仮リンク (https://claude.ai/artifact/2Hzd9a8dx7E3Lqtkc6d4aU)。
+  本番とはアドレスがちがうので、保存 (コイン・ずかん) も別々になる
+- この作業環境からは github.io に接続できない (403)。本番が出たかは、
+  GitHub Actions の「pages build and deployment」の結果で確かめる
+
 <!-- ここまで -->
 
 ---
