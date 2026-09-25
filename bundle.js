@@ -12,6 +12,9 @@ const dataUri = (f) => 'data:image/webp;base64,' + fs.readFileSync(path.join(ROO
 const inlineImgs = (text) => text.replace(/img\/([a-z_-]+)\.webp/g, (m) => dataUri(m));
 
 let html = read('index.html');
+// 仮リンク (Artifact) には、アイコン・manifest・サービスワーカーを持ちこまない (置き場所が無い)
+html = html.replace(/<link rel="(apple-touch-icon|icon|manifest)"[^>]*>\n/g, '');
+html = html.replace('</title>', '</title>\n<script>window.__BUNDLE = 1;</script>');
 const must = (cond, what) => { if (!cond) throw new Error('まとめられない: ' + what); };
 
 must(html.includes('<link rel="stylesheet" href="./styles.css">'), 'styles.css の読みこみ');

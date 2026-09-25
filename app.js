@@ -5,6 +5,8 @@
   'use strict';
 
   const C = window.Core;
+  // 版の番号。sw.js の VERSION とそろえる (npm test が見る)。実機の写真で「どの版が動いているか」を見分けるため
+  const VERSION = 3;
   const { SP, DC, DECOR, SPECIES, FORM_N } = C;
   const src = (key) => C.imgSrc(key);
   const ratio = (key) => C.IMG_SIZE[key][1] / C.IMG_SIZE[key][0];
@@ -318,7 +320,7 @@
       html += `<div class="zk-card ${state.claimed['s_' + s.id] ? 'done' : ''}"><div class="zk-head"><div class="zk-main">${main}</div>
         <div class="zk-info"><b>${known ? s.name : '？？？'}</b><span class="cnt">${n}/${FORM_N}</span><div class="zk-forms">${forms}</div></div></div>${note}${reward}</div>`;
     }
-    document.getElementById('zukanGrid').innerHTML = top + html;
+    document.getElementById('zukanGrid').innerHTML = top + html + diagLine();
     document.getElementById('zukanCount').textContent = '';
     document.querySelectorAll('[data-claim]').forEach((b) => {
       b.onclick = () => {
@@ -328,6 +330,15 @@
       };
     });
     updateZukanBadge();
+  }
+  /** 実機で見分けるための小さな一行: 版 / 描ける高さ / 窓の高さ / 100vh */
+  function diagLine() {
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute;top:0;height:100vh;width:0;visibility:hidden';
+    document.body.appendChild(probe);
+    const vh = Math.round(probe.getBoundingClientRect().height); probe.remove();
+    const draw = Math.round(document.body.getBoundingClientRect().height);
+    return `<div id="diag">版 ${VERSION} ・ 描ける ${draw} / 窓 ${window.innerHeight} / vh ${vh}</div>`;
   }
   function updateZukanBadge() {
     const b = document.getElementById('zukanBadge'); const n = C.claimable(state.found, state.claimed);
@@ -387,6 +398,12 @@
   // iPhone は、指でさわった流れの中でないと音を出せない。さわるたびに起こしておく
   document.addEventListener('pointerdown', () => Sound.unlock(), true);
 
+  /* ===== オフライン ===== */
+  // テストプレイ用の 1 枚 HTML (bundle.js) では使わない (sw.js が無い)
+  if ('serviceWorker' in navigator && !window.__BUNDLE && /^https:|^http:\/\/localhost/.test(location.href)) {
+    window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => {}); });
+  }
+
   /* ===== スタート ===== */
   function init() {
     load();
@@ -421,6 +438,7 @@
     tick: tick,
     addFish: addFish,
     sounds: () => Sound.log,
+    version: VERSION,
     discover: discover
   };
 

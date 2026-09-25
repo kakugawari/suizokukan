@@ -5,8 +5,11 @@
   --gold:#ffd24d; --gold-dark:#c98c1a;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;}
-html,body{height:100%; margin:0; overflow:hidden; font-family:"Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic",-apple-system,sans-serif;}
-:root{ padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+/* 根っこは 100vh + position:relative (100% だと、ホーム画面から開いたとき下に帯が出る。
+   iOS が % の基準に渡す高さが、上の安全域ぶん足りないため)。安全域の余白は body の内側に取る */
+html,body{height:100vh; position:relative; margin:0; overflow:hidden; font-family:"Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic",-apple-system,sans-serif;}
+html{background:#081c30;}
+body{padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);}
 body{
   background:radial-gradient(120% 60% at 50% 0%, #17406a 0%, var(--navy) 55%, #081c30 100%);
   display:flex; flex-direction:column; color:var(--ink);
@@ -197,3 +200,4 @@ img{-webkit-user-drag:none; pointer-events:none;}
   background:rgba(0,0,0,.2);}
 .dc-fact::before{content:"まめちしき　"; color:var(--gold); font-weight:900;}
 .dc-tap{position:relative; font-size:11px; color:var(--sub); margin-top:12px;}
+#diag{font-size:10px; color:var(--sub); text-align:center; margin:14px 0 2px; opacity:.8; font-variant-numeric:tabular-nums;}

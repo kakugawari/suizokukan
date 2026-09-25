@@ -124,6 +124,41 @@ async function run() {
       .filter((i) => i.getAttribute('src') && (!i.complete || !i.naturalWidth)).map((i) => i.src));
     ok(broken.length === 0, '絵が全部読みこめている' + (broken.length ? ': ' + broken.join(', ') : ''));
 
+    // ------------------------------------------------ 画面の高さ
+    section('ホーム画面から開いたときの高さ');
+    // 手もとの chromium では「100% と 100vh の差」も安全域も起きない。
+    // なので (1) 根っこの指定そのものを読む (2) 実機の安全域 (上 59・下 34) を差しこんで、932 に収まるかを測る
+    const root = await phone.evaluate(() => {
+      for (const sh of document.styleSheets) for (const r of sh.cssRules) {
+        if (r.selectorText === 'html, body' && r.style.height) return { h: r.style.height, pos: r.style.position };
+      }
+      return {};
+    });
+    ok(root.h === '100vh' && root.pos === 'relative', `根っこは 100vh + position:relative (${root.h} / ${root.pos})`);
+    const full = await browser.newContext({ ...PHONE, viewport: { width: 430, height: 932 } });
+    const fp = await full.newPage();
+    await fp.goto(URL);
+    await fp.waitForFunction(() => window.__app && window.__app.ready());
+    const fit932 = await fp.evaluate(() => {
+      // CSS に書いた env(safe-area-inset-*) を、実機の値に全部おきかえる (書いた場所ごと確かめるため)
+      const SAFE = { top: '59px', bottom: '34px', left: '0px', right: '0px' };
+      for (const sh of document.styleSheets) for (const r of sh.cssRules) {
+        if (!r.style) continue;
+        for (const prop of [...r.style]) {
+          const v = r.style.getPropertyValue(prop);
+          if (v.includes('safe-area-inset')) r.style.setProperty(prop, v.replace(/env\(safe-area-inset-(\w+)[^)]*\)/g, (m, k) => SAFE[k]));
+        }
+      }
+      const nav = document.getElementById('nav').getBoundingClientRect();
+      const top = document.getElementById('topbar').getBoundingClientRect();
+      return { navBottom: Math.round(nav.bottom), topTop: Math.round(top.top), scroll: document.documentElement.scrollHeight,
+        tank: Math.round(document.getElementById('tank').getBoundingClientRect().height) };
+    });
+    ok(fit932.scroll <= 932, `安全域を入れても 932 に収まる (${fit932.scroll})`);
+    ok(fit932.topTop >= 59 && fit932.navBottom <= 932 - 34, `上の帯は 59 より下、下のボタンは 898 より上 (上 ${fit932.topTop} / 下 ${fit932.navBottom})`);
+    ok(fit932.tank >= 600, `水槽がつぶれない (高さ ${fit932.tank})`);
+    await full.close();
+
     // ------------------------------------------------ アプリの操作
     section('魚をさわる');
     const app = (fn, arg) => phone.evaluate(fn, arg);
@@ -262,6 +297,8 @@ async function run() {
     section('ずかん');
     await phone.locator('#btnZukan').click();
     ok(await phone.locator('.zk-card').count() === 10, 'ずかんに 10 種ならぶ');
+    const diag = (await phone.textContent('#diag')) || '';
+    ok(/^版 \d+ ・ 描ける \d+ \/ 窓 \d+ \/ vh \d+$/.test(diag.trim()), `ずかんの下に 版と高さが出る (${diag.trim()})`);
     const zk = await phone.evaluate(() => document.querySelector('.zk-top').textContent);
     // クマノミ・ナンヨウハギ・キイロハギ・ウミガメ・エビ + エビどうしで生まれた色 (ふつうなら増えない)
     const got = Number((zk.match(/(\d+) \/ 50/) || [])[1]);
@@ -307,6 +344,15 @@ async function run() {
       ok(apple.endsWith('.png'), `ホーム画面用アイコンが PNG (${apple})`);
       const res = await desk.request.get(URL + apple.replace('./', ''));
       ok(res.ok(), `${apple} が配信される`);
+      const mf = await desk.request.get(URL + 'manifest.webmanifest');
+      const man = mf.ok() ? await mf.json() : {};
+      ok(man.display === 'standalone' && (man.icons || []).length >= 2, 'manifest があり、ホーム画面から全画面で開く指定');
+      for (const ic of man.icons || []) {
+        const r = await desk.request.get(URL + ic.src);
+        const buf = r.ok() ? await r.body() : Buffer.alloc(0);
+        const w = buf.length > 24 ? buf.readUInt32BE(16) : 0;
+        ok(w === Number(ic.sizes.split('x')[0]), `${ic.src} が ${ic.sizes} の PNG (幅 ${w})`);
+      }
     }
 
     // ------------------------------------------------ 更新とオフライン (sw.js があれば)
@@ -318,29 +364,50 @@ async function run() {
       const swPage = await swCtx.newPage();
       await swPage.goto(URL);
       await swPage.waitForFunction(() => window.__app);
-      ok(await swPage.evaluate(() => navigator.serviceWorker.ready.then((r) => !!r.active).catch(() => false)),
+      // 登録されないと ready はいつまでも返らないので、5 秒で見切る
+      ok(await swPage.evaluate(() => Promise.race([
+        navigator.serviceWorker.ready.then((r) => !!r.active).catch(() => false),
+        new Promise((r) => setTimeout(() => r(false), 5000))])),
         'サービスワーカーが動く');
       await swPage.waitForTimeout(800);
 
       // 直したものが 1 回のリロードで出るか (キャッシュ優先だと古い画面が出る)
       const indexPath = path.join(ROOT, 'index.html');
       const original = fs.readFileSync(indexPath, 'utf8');
-      const marker = original.match(/<h1[^>]*>([^<]*)<\/h1>/);
-      fs.writeFileSync(indexPath, original.replace(marker[1], 'こうしんかくにん'));
-      await swPage.reload();
-      await swPage.waitForTimeout(400);
-      const title = await swPage.textContent('h1');
-      fs.writeFileSync(indexPath, original);
-      ok(title.trim() === 'こうしんかくにん', `直したものが 1 回のリロードで出る (${title.trim()})`);
+      const MARK = 'alt="">すいぞくかん</div>';
+      ok(original.includes(MARK), '見出しの字を書きかえて確かめる準備');
+      let title = '';
+      try {
+        fs.writeFileSync(indexPath, original.replace(MARK, 'alt="">こうしんかくにん</div>'));
+        await swPage.reload();
+        await swPage.waitForTimeout(400);
+        title = (await swPage.textContent('#title')).trim();
+      } finally {
+        fs.writeFileSync(indexPath, original);   // 失敗しても元にもどす
+      }
+      ok(title === 'こうしんかくにん', `直したものが 1 回のリロードで出る (${title})`);
 
       await swPage.reload();
       await swPage.waitForTimeout(500);
-      await swCtx.setOffline(true);
+      // playwright の setOffline はサービスワーカーの通信には効かない (試して分かった)。
+      // 本当に届かなくするため、サーバーそのものを止める
+      server.kill();
+      await new Promise((r) => setTimeout(r, 300));
+      const down = await swPage.evaluate(() => fetch('/__none__?' + Math.random(), { cache: 'no-store' }).then(() => 'とどいた', () => 'とどかない'));
+      ok(down === 'とどかない', `サーバーを止めると、本当に届かなくなっている (${down})`);
       await swPage.reload().catch(() => {});
       await swPage.waitForTimeout(400);
       ok(await swPage.evaluate(() => !!window.__app).catch(() => false),
         'ネットにつながらなくても開ける');
-      await swCtx.setOffline(false);
+      const off = await swPage.evaluate(async () => {
+        const imgs = [...document.querySelectorAll('#tank .fish img')];
+        const shown = imgs.length > 0 && imgs.every((i) => i.complete && i.naturalWidth > 0);
+        // まだ一度も表示していない絵 (かいぞくせん) も、控えから出せるか
+        const r = await fetch('img/d_ship.webp').then((x) => x.ok).catch(() => false);
+        return { shown, r };
+      }).catch(() => ({}));
+      ok(off.shown, 'オフラインでも魚の絵が出る');
+      ok(off.r, 'オフラインでも、まだ見ていない絵 (おきもの) を出せる');
     }
 
     section('エラー');

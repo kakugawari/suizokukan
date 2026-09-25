@@ -129,3 +129,26 @@ test('pickPartner: 届く範囲で、なかよしを先に、近い順に選ぶ'
   assert.strictEqual(C.pickPartner(f, [f, near, far], 50), near);   // なかよしが届かなければ近い魚
   assert.strictEqual(C.pickPartner(f, [f, far], 50), null);
 });
+
+test('オフライン用の控え (sw.js の FILES) に、配るファイルが全部入っている', () => {
+  const sw = fs.readFileSync(path.join(__dirname, 'sw.js'), 'utf8');
+  const files = JSON.parse('[' + sw.match(/const FILES = \[([\s\S]*?)\];/)[1].replace(/'/g, '"') + ']');
+  // 絵は全部
+  const imgs = fs.readdirSync(path.join(__dirname, 'img')).map((f) => 'img/' + f);
+  imgs.forEach((f) => assert.ok(files.includes(f), f + ' が FILES に無い'));
+  // index.html が読みこむものも全部
+  const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  const refs = [...html.matchAll(/(?:src|href)="\.\/([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(refs.length >= 6, '読みこみが見つからない: ' + refs.join(','));
+  refs.forEach((f) => assert.ok(files.includes(f), f + ' が FILES に無い'));
+  // manifest のアイコンも
+  const mf = JSON.parse(fs.readFileSync(path.join(__dirname, 'manifest.webmanifest'), 'utf8'));
+  mf.icons.forEach((i) => assert.ok(files.includes(i.src), i.src + ' が FILES に無い'));
+  // FILES に書いた物は実在する
+  files.filter((f) => f !== './').forEach((f) => assert.ok(fs.existsSync(path.join(__dirname, f)), f + ' が無い'));
+});
+
+test('版の番号が app.js と sw.js でそろっている', () => {
+  const v = (f) => Number(fs.readFileSync(path.join(__dirname, f), 'utf8').match(/const VERSION = (\d+);/)[1]);
+  assert.strictEqual(v('app.js'), v('sw.js'));
+});
